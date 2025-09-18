@@ -7,7 +7,7 @@ real-world data in R Markdown using reproducible workflows.
 ## Files Included
 - `Class 1 Survey Fall 2025 2.csv`: Class 1 survey dataset (as provided)
 - `Class1survey.rmd`: R Markdown used to import, clean, and analyze the data
-- `Class1survey.html`: Knitted HTML output (optional for grading)
+- `Class1survey.html`: Knitted HTML output 
 - `README.md`: This file
 
 ## What the Code Does
