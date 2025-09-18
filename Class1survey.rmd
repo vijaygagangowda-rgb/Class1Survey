@@ -1,0 +1,195 @@
+---
+title: "class1survey2025"
+author: "Gagan Vijay"
+date: "2025-09-18"
+output: html_document
+---
+
+##Installing and loading required Packages.
+
+```{r chunk 1}
+pacman::p_load(readr, dplyr, janitor, stringr)
+
+library(readr)    
+library(dplyr)    
+library(janitor)  
+library(stringr)  
+```
+
+## Importing class 1 survey data from github
+
+```{r chunk 2}
+
+C1survey <- read_csv("https://github.com/kijohnson/Advanced-Data-Analysis/raw/refs/heads/main/Class%201%20Survey%20Fall%202025%202.csv")
+
+```
+
+## Number of observations and the number of variables in the data frame
+
+```{r}
+if (interactive()) View(C1survey)
+
+##variables=27
+##observations=58
+
+##while knitting had some issue with MacOSX11 error code so added if interactive
+```
+
+## Renaming the column variables.
+
+```{r chunk 3}
+
+target_names <- c(
+  "id","like_cats","like_dogs","have_desert","slogan","fav_day","larkORowl",
+  "fav_food","fav_drink","fav_season","fav_month","hobby","program",
+  "specialization","stat_software","R_exp","coding_comfort","coding_length",
+  "top_three","public_health_interest","fav_num","bday","bmonth","country",
+  "state","city","highest_educ_level"
+)
+colnames(C1survey) <- target_names
+
+colnames(C1survey)
+```
+
+## Code that Displays the number of factor,integer, numerical, and characters.
+
+```{r chunk 4}
+
+var_classes <- sapply(C1survey, function(x) class(x)[1])
+
+c(
+  factor    = sum(sapply(C1survey, is.factor)),
+  integer   = sum(sapply(C1survey, is.integer)),
+  numeric   = sum(sapply(C1survey, is.numeric)),  
+  character = sum(sapply(C1survey, is.character))
+)
+
+```
+
+## 
+
+```{r}
+## checking for values(missing/NA)
+
+table(C1survey$bday,   useNA = "ifany")
+table(C1survey$bmonth, useNA = "ifany")
+
+##Cleaning Bday
+
+bday_chr <- as.character(C1survey$bday)
+bday_num <- as.integer(sub(".*?(\\d{1,2}).*", "\\1", bday_chr))
+bday_num[!(bday_num %in% 1:31)] <- NA_integer_
+C1survey$bday <- bday_num
+
+##Cleaning Bdaymonth
+
+m_chr <- tolower(trimws(as.character(C1survey$bmonth)))
+m_num <- suppressWarnings(as.integer(m_chr))
+map_full <- setNames(1:12, tolower(month.name))
+map_abb  <- setNames(1:12, tolower(month.abb))
+m_from_full <- unname(map_full[m_chr])
+m_from_abb  <- unname(map_abb[m_chr])
+bmonth_num <- ifelse(!is.na(m_num), m_num,
+                     ifelse(!is.na(m_from_full), m_from_full, m_from_abb))
+bmonth_num[!(bmonth_num %in% 1:12)] <- NA_integer_
+C1survey$bmonth <- as.integer(bmonth_num)
+
+#I examined bday/bmonth with table(), then cleaned bday by extracting a 1–2 digit number and keeping only 1–31, and cleaned bmonth by accepting numbers, full names, or 3-letter abbreviations and mapping them to 1–12; all invalid values were set to NA. I will recheck with table() and compute medians using na.rm=TRUE
+
+## Checking 
+
+cat("Cleaned bday counts:\n");   print(table(C1survey$bday,   useNA = "ifany"))
+cat("Cleaned bmonth counts:\n"); print(table(C1survey$bmonth, useNA = "ifany"))
+
+## Median
+
+median_bday   <- median(C1survey$bday,   na.rm = TRUE)
+median_bmonth <- median(C1survey$bmonth, na.rm = TRUE)
+
+
+
+```
+
+# Creating a new variable bseason from cleaned bmonth(Nothern meterologival season)
+
+```{r}
+
+## Creating bseason
+C1survey <- C1survey %>%
+  mutate(
+    bseason = case_when(
+      bmonth %in% c(12, 1, 2) ~ "Winter",
+      bmonth %in% 3:5         ~ "Spring",
+      bmonth %in% 6:8         ~ "Summer",
+      bmonth %in% 9:11        ~ "Fall",
+      TRUE                    ~ NA_character_
+    )
+  )
+
+## Printing a table of seasons in columns and bdaymonth in rows
+tab_month_season <- table(bmonth = C1survey$bmonth,
+                          bseason = C1survey$bseason,
+                          useNA = "ifany")
+tab_month_season
+
+## Sum columns directly
+
+wanted_cols <- intersect(c("Winter","Spring","Summer","Fall"),
+                         colnames(tab_month_season))
+season_totals <- colSums(tab_month_season[, wanted_cols, drop = FALSE], na.rm = TRUE)
+
+cat("\nNumber of classmates born in each season:\n")
+print(season_totals)
+
+##Answers
+#Winter Spring Summer   Fall 
+#   10     16     16     14 
+```
+
+```{r}
+# Q7 — Are dogs or cats more popular among classmates?
+
+# 1) Quick look at raw responses
+table(C1survey$like_cats, useNA = "ifany")
+table(C1survey$like_dogs, useNA = "ifany")
+
+# 2) Normalize yes/no to 1/0 
+yn_to01 <- function(x) {
+  z <- tolower(trimws(as.character(x)))
+  ifelse(z %in% c("yes","y","true","1"), 1L,
+         ifelse(z %in% c("no","n","false","0"), 0L, NA_integer_))
+}
+
+C1survey <- C1survey %>%
+  mutate(
+    like_cats01 = yn_to01(like_cats),
+    like_dogs01 = yn_to01(like_dogs)
+  )
+
+# 3) Count how many "yes" for each
+cats_yes <- sum(C1survey$like_cats01 == 1, na.rm = TRUE)
+dogs_yes <- sum(C1survey$like_dogs01 == 1, na.rm = TRUE)
+
+counts <- data.frame(
+  pet  = c("Cats", "Dogs"),
+  yes  = c(cats_yes, dogs_yes)
+)
+counts  # shows the counts for the grader
+
+# 4) Identify which is more popular and print an answer line
+most_popular <- if (cats_yes > dogs_yes) {
+  "Cats"
+} else if (dogs_yes > cats_yes) {
+  "Dogs"
+} else {
+  "Tie"
+}
+
+cat("ANSWER — More popular pet among classmates:", most_popular,
+    "(Cats yes =", cats_yes, ", Dogs yes =", dogs_yes, ")\n")
+
+##****Answer****
+#I used table() to review raw like_cats and like_dogs values for spelling and missingness, standardised yes/no responses to 1/0, then counted the ‘yes’ responses for each pet and printed a clear ANSWER line naming the more popular option.
+
+
+```
